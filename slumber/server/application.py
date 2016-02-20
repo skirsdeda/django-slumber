@@ -15,7 +15,7 @@ class DjangoApp(object):
         if hasattr(self.module, 'models'):
             for name in self.module.models.__dict__.keys():
                 potential = getattr(self.module.models, name)
-                if hasattr(potential, '_meta') and (
+                if hasattr(potential, '_meta') and hasattr(potential._meta, 'app_label') and (
                         appname == potential._meta.app_label or
                         appname.endswith('.' + potential._meta.app_label)):
                     model = DjangoModel(self, potential)
