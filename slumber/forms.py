@@ -7,7 +7,7 @@ from django.contrib.admin.widgets import AdminURLFieldWidget
 from slumber.connector.api import _InstanceProxy, get_instance
 from slumber.scheme import from_slumber_scheme
 from slumber.server import get_slumber_services
-
+import copy
 
 class RemoteForeignKeyWidget(forms.TextInput):
     """A widget that allows the URL to be edited.
@@ -51,6 +51,63 @@ class RemoteForeignKeyField(forms.Field):
                     self.model_url, get_slumber_services())
                 instance = get_instance(model_url, value, None)
                 unicode(instance)
+            
             except AssertionError:
                 raise forms.ValidationError("The remote object doesn't exist")
             return instance
+
+from django.forms.widgets import Select
+
+class TypedRemoteChoiceField(RemoteForeignKeyField):
+    def __init__(self, coerce=None, *args, **kwargs):
+        self.empty_value = kwargs.pop('empty_value', '')
+        kwargs['widget'] = Select()
+        choices = kwargs.pop('choices', [])
+        super(TypedRemoteChoiceField, self).__init__(*args, **kwargs)
+        self.choices = choices
+
+    def __deepcopy__(self, memo):
+        result = super(TypedRemoteChoiceField, self).__deepcopy__(memo)
+        result._choices = copy.deepcopy(self._choices, memo)
+        return result
+
+    def _get_choices(self):
+        return self._choices
+
+    def _set_choices(self, value):
+        # Setting choices also sets the choices on the widget.
+        # choices can be any iterable, but we call list() on it because
+        # it will be consumed more than once.
+        self._choices = self.widget.choices = list(value)
+
+    choices = property(_get_choices, _set_choices)
+    
+    def to_python(self, value):
+        if not value:
+            return None
+        if isinstance(value, _InstanceProxy):
+            return value
+        instance_url = from_slumber_scheme(
+            super(TypedRemoteChoiceField, self).to_python(value),
+            get_slumber_services())
+        model_url = from_slumber_scheme(
+            self.model_url, get_slumber_services())
+        return get_instance(model_url, instance_url, None)
+    
+#     def to_python(self, value):
+#         """
+#         Validates that the value is in self.choices and can be coerced to the
+#         right type.
+#         """
+#         value = super(TypedChoiceField, self).to_python(value)
+#         if value == self.empty_value or value in self.empty_values:
+#             return self.empty_value
+#         try:
+#             value = self.coerce(value)
+#         except (ValueError, TypeError, ValidationError):
+#             raise ValidationError(
+#                 self.error_messages['invalid_choice'],
+#                 code='invalid_choice',
+#                 params={'value': value},
+#             )
+#         return value

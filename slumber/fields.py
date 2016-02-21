@@ -5,10 +5,11 @@ from django.db.models import URLField, SubfieldBase
 
 from slumber.connector.api import _InstanceProxy, get_instance
 #from slumber.connector.dictobject import DictObject
-from slumber.forms import RemoteForeignKeyField
+from slumber.forms import RemoteForeignKeyField, TypedRemoteChoiceField
 from slumber.scheme import to_slumber_scheme, from_slumber_scheme
 from slumber.server import get_slumber_services
 
+from django.utils.text import capfirst
 
 class RemoteForeignKey(URLField):
     """Wraps Django's URLField to provide a field that references a remote
@@ -35,6 +36,9 @@ class RemoteForeignKey(URLField):
     def run_validators(self, value):
         # Do not rely on validators as we want to support Django 1.0
         pass
+    
+    def validate(self, x, y):
+        return
 
     def get_db_prep_value(self, value, *a, **kw):
         if value is None:
@@ -43,7 +47,8 @@ class RemoteForeignKey(URLField):
             url = to_slumber_scheme(value, get_slumber_services())
         else:
             url = to_slumber_scheme(value._url, get_slumber_services())
-        return super(RemoteForeignKey, self).get_db_prep_value(url, *a, **kw)
+        res = super(RemoteForeignKey, self).get_db_prep_value(url, *a, **kw)
+        return res
 
     def get_prep_value(self, value, *a, **kw):
         if isinstance(value, basestring) or value is None:
@@ -63,11 +68,52 @@ class RemoteForeignKey(URLField):
             self.model_url, get_slumber_services())
         return get_instance(model_url, instance_url, None)
 
+    def parent_formfield(self, form_class=None, choices_form_class=None, **kwargs):
+        """
+        Returns a django.forms.Field instance for this database Field.
+        """
+        defaults = {'required': not self.blank,
+                    'label': capfirst(self.verbose_name),
+                    'help_text': self.help_text}
+        if self.has_default():
+            if callable(self.default):
+                defaults['initial'] = self.default
+                defaults['show_hidden_initial'] = True
+            else:
+                defaults['initial'] = self.get_default()
+        if self.choices:
+            # Fields with choices get special treatment.
+            include_blank = (self.blank or
+                             not (self.has_default() or 'initial' in kwargs))
+            defaults['choices'] = self.get_choices(include_blank=include_blank)
+            defaults['coerce'] = self.to_python
+            if self.null:
+                defaults['empty_value'] = None
+            if choices_form_class is not None:
+                form_class = choices_form_class
+            else:
+                form_class = forms.TypedChoiceField
+            # Many of the subclass-specific formfield arguments (min_value,
+            # max_value) don't apply for choice fields, so be sure to only pass
+            # the values that TypedChoiceField will understand.
+            for k in list(kwargs):
+                if k not in ('coerce', 'empty_value', 'choices', 'required',
+                             'widget', 'label', 'initial', 'help_text',
+                             'error_messages', 'show_hidden_initial', 'model_url'):
+                    del kwargs[k]
+        defaults.update(kwargs)
+        if form_class is None:
+            form_class = forms.CharField
+        return form_class(**defaults)
+
     def formfield(self, **kwargs):
         defaults = {'form_class': RemoteForeignKeyField,
             'model_url': self.model_url}
         defaults.update(kwargs)
-        return super(RemoteForeignKey, self).formfield(**defaults)
+        defaults['choices_form_class'] = TypedRemoteChoiceField
+        #copied because kwargs for choice field are hardcoded but we need model_url
+        res = self.parent_formfield(**defaults) 
+        return res
 
 
 try:
