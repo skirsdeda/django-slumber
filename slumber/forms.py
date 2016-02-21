@@ -8,6 +8,8 @@ from slumber.connector.api import _InstanceProxy, get_instance
 from slumber.scheme import from_slumber_scheme
 from slumber.server import get_slumber_services
 import copy
+from slumber.scheme import to_slumber_scheme, from_slumber_scheme
+from slumber.server import get_slumber_services
 
 class RemoteForeignKeyWidget(forms.TextInput):
     """A widget that allows the URL to be edited.
@@ -57,11 +59,17 @@ class RemoteForeignKeyField(forms.Field):
             return instance
 
 from django.forms.widgets import Select
+class RemoteSelect(Select):
+    def render(self, name, value, attrs=None, choices=()):
+        # we had to cast slumber field to string
+        if value is not None:
+            value = to_slumber_scheme(value._url, get_slumber_services())
+        return super(RemoteSelect, self).render(name, value, attrs=attrs, choices=choices)       
 
 class TypedRemoteChoiceField(RemoteForeignKeyField):
     def __init__(self, coerce=None, *args, **kwargs):
         self.empty_value = kwargs.pop('empty_value', '')
-        kwargs['widget'] = Select()
+        kwargs['widget'] = RemoteSelect()
         choices = kwargs.pop('choices', [])
         super(TypedRemoteChoiceField, self).__init__(*args, **kwargs)
         self.choices = choices
