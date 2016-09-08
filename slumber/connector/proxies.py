@@ -3,7 +3,7 @@
 """
 from urlparse import urljoin
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 
 from slumber.connector.api import get_instance_from_data
 from slumber.connector.configuration import INSTANCE_PROXIES, MODEL_PROXIES
@@ -15,7 +15,9 @@ def attach_to_local_user(remote_user):
     """
     # Django adds get_or_create in some add manner
     # pylint: disable=no-member
-    user, _ = User.objects.get_or_create(username=remote_user.username)
+    # FIXME: this assumes that username field is "username" which might not be
+    # true
+    user, _ = get_user_model().objects.get_or_create(username=remote_user.username)
     for attr in ['is_active', 'is_staff', 'date_joined', 'is_superuser',
             'first_name', 'last_name', 'email']:
         v = getattr(remote_user, attr)

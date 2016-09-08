@@ -2,19 +2,17 @@
     Implements the user agent used to communicate with the Slumber
     servers.
 """
-from django.conf import settings
-from django.core.cache import cache
-from django.test.client import Client as FakeClient, encode_multipart, \
-    BOUNDARY
-from django.utils.http import urlencode
-
-from datetime import datetime
-from fost_authn.signature import fost_hmac_request_signature
-from httplib2 import Http
 import logging
-from simplejson import dumps, JSONDecodeError, loads
+from datetime import datetime
 from urllib import urlencode
 from urlparse import parse_qs, urlparse
+
+from django.conf import settings
+from django.core.cache import cache
+from django.test.client import Client as FakeClient
+from django.test.client import BOUNDARY, encode_multipart
+from httplib2 import Http
+from simplejson import JSONDecodeError, dumps, loads
 
 from slumber._caches import PER_THREAD
 from slumber.server import get_slumber_local_url_prefix
@@ -56,6 +54,8 @@ def _use_fake(url):
 def _calculate_signature(authn_name, method, url, body, username):
     """Do the signed request calculation.
     """
+    from fost_authn.signature import fost_hmac_request_signature
+
     # We need all arguments and all locals
     # pylint: disable=R0913
     # pylint: disable=R0914
