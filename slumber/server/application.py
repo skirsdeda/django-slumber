@@ -1,25 +1,21 @@
 """
     Implements the Django application wrapper for the Slumber server.
 """
-from slumber.server.model import DjangoModel
+from .model import DjangoModel
 
 
 class DjangoApp(object):
     """Describes a Django application.
     """
-    def __init__(self, appname):
-        self.name = appname
-        self.path = appname.replace('.', '/')
-        self.module = __import__(appname, globals(), locals(), ['models'])
+    def __init__(self, app_config):
+        self.app_config = app_config
+        self.name = app_config.name
+        self.path = app_config.name.replace('.', '/')
+        self.module = app_config.module
         self.models = {}
-        if hasattr(self.module, 'models'):
-            for name in self.module.models.__dict__.keys():
-                potential = getattr(self.module.models, name)
-                if hasattr(potential, '_meta') and hasattr(potential._meta, 'app_label') and (
-                        appname == potential._meta.app_label or
-                        appname.endswith('.' + potential._meta.app_label)):
-                    model = DjangoModel(self, potential)
-                    self.models[name] = model
+        for model in app_config.get_models():
+            model_wrap = DjangoModel(self, model)
+            self.models[model.__name__] = model_wrap
 
     def __repr__(self):
         return self.name

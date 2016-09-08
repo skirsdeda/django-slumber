@@ -1,11 +1,10 @@
 """
     Wrappers for interacting with Django in the server.
 """
-from django.conf import settings
+from django.apps import apps as django_apps
 
-from slumber._caches import APP_FROM_APPNAME
-from slumber.server.application import DjangoApp
-
+from .._caches import APP_FROM_APPNAME
+from .application import DjangoApp
 
 IMPORTING = None
 
@@ -18,7 +17,8 @@ def applications():
     if APP_FROM_APPNAME:
         return APP_FROM_APPNAME.values()
     else:
-        apps = [get_application(app) for app in settings.INSTALLED_APPS]
+        apps = [get_application(app) for app in django_apps.get_app_configs()
+                if any(app.get_models())]
         for app in apps:
             global IMPORTING
             IMPORTING = app.name
@@ -27,10 +27,10 @@ def applications():
         return apps
 
 
-def get_application(app_name):
+def get_application(app_config):
     """Build a Django application wrapper around an application given
     by its name.
     """
-    if not APP_FROM_APPNAME.has_key(app_name):
-        APP_FROM_APPNAME[app_name] = DjangoApp(app_name)
-    return APP_FROM_APPNAME[app_name]
+    if app_config.name not in APP_FROM_APPNAME:
+        APP_FROM_APPNAME[app_config.name] = DjangoApp(app_config)
+    return APP_FROM_APPNAME[app_config.name]
