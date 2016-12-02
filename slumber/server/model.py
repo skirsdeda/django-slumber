@@ -65,7 +65,7 @@ class DjangoModel(object):
         """
         if self._fields or self._data_arrays:
             return
-        for field in self.model._meta.get_all_field_names():
+        for field in self.model._meta.get_fields():
             try:
                 definition = self.model._meta.get_field(field)
                 if isinstance(definition, ManyToManyField) or \
